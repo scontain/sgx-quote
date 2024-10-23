@@ -1,7 +1,4 @@
-#[macro_use]
-extern crate nom;
-
-use nom::{error::ErrorKind, Err};
+use nom::Finish;
 
 mod parsers;
 
@@ -14,15 +11,17 @@ pub struct Quote<'a> {
 }
 
 /// An Intel SGX Version 3 quote, as specified in
-//// https://download.01.org/intel-sgx/dcap-1.1/linux/docs/Intel_SGX_ECDSA_QuoteGenReference_DCAP_API_Linux_1.1.pdf.
+/// https://download.01.org/intel-sgx/dcap-1.1/linux/docs/Intel_SGX_ECDSA_QuoteGenReference_DCAP_API_Linux_1.1.pdf.
 impl<'a> Quote<'a> {
-    pub fn parse(quote_bytes: &'a [u8]) -> Result<Self, Err<(&'a [u8], ErrorKind)>> {
-        crate::parsers::parse_quote(quote_bytes).map(|qp| qp.1)
+    pub fn parse(quote_bytes: &'a [u8]) -> Result<Self, nom::error::Error<&'a [u8]>> {
+        crate::parsers::parse_quote(quote_bytes)
+            .finish()
+            .map(|(_input, quote)| quote)
     }
 
     /// Returns the part of the quote that's signed by the AK (i.e. *header* || *isv_report*).
     pub fn signed_message(&self) -> &[u8] {
-        &self.signed_message
+        self.signed_message
     }
 }
 
@@ -60,10 +59,10 @@ pub struct ReportBody<'a> {
     signed_message: &'a [u8],
 }
 
-impl<'a> ReportBody<'a> {
+impl ReportBody<'_> {
     /// Returns the part of the QE report body that's been signed by the PCK.
     pub fn signed_message(&self) -> &[u8] {
-        &self.signed_message
+        self.signed_message
     }
 }
 

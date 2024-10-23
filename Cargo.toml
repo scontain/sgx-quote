@@ -10,4 +10,4 @@ keywords = ["sgx", "attestation", "dcap"]
 edition = "2018"
 
 [dependencies]
-nom = "5.0"
+nom = "7"
