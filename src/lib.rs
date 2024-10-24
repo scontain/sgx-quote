@@ -1,4 +1,4 @@
-use winnow::FinishIResult;
+use winnow::Parser;
 
 mod parsers;
 
@@ -14,9 +14,7 @@ pub struct Quote<'a> {
 /// https://download.01.org/intel-sgx/dcap-1.1/linux/docs/Intel_SGX_ECDSA_QuoteGenReference_DCAP_API_Linux_1.1.pdf.
 impl<'a> Quote<'a> {
     pub fn parse(quote_bytes: &'a [u8]) -> Result<Self, winnow::error::Error<&'a [u8]>> {
-        crate::parsers::parse_quote(quote_bytes)
-            .finish_err()
-            .map(|(_input, quote)| quote)
+        crate::parsers::parse_quote.parse(quote_bytes)
     }
 
     /// Returns the part of the quote that's signed by the AK (i.e. *header* || *isv_report*).

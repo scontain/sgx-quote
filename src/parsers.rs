@@ -1,8 +1,8 @@
 use winnow::{
+    binary::{le_u16, le_u32},
     bytes::take,
     combinator::eof,
     multi::{length_data, length_value},
-    number::{le_u16, le_u32},
     IResult, Parser,
 };
 
