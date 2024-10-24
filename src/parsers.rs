@@ -1,5 +1,7 @@
 use nom::{
-    bytes::complete,
+    bytes::complete::take,
+    combinator::{eof, map, verify},
+    multi::{length_data, length_value},
     number::complete::{le_u16, le_u32},
     IResult,
 };
@@ -12,9 +14,8 @@ pub const REPORT_SIZE: usize = 384;
 pub(crate) fn parse_quote(input: &[u8]) -> IResult<&[u8], Quote> {
     let (i, HeaderExt { header, ak_ty }) = parse_header_ext(input)?;
     let (i, isv_report) = parse_report_body(i)?;
-    let (i, len) = le_u32(i)?;
-    let (i, signature) = parse_signature(&i[..(len as usize)], ak_ty)?;
-    let (i, _) = nom::combinator::eof(i)?;
+    let (i, signature) = length_value(le_u32, |input| parse_signature(input, ak_ty))(i)?;
+    let (i, _) = eof(i)?;
     Ok((
         i,
         Quote {
@@ -34,11 +35,11 @@ struct HeaderExt<'a> {
 fn parse_header_ext(input: &[u8]) -> IResult<&[u8], HeaderExt> {
     let (i, version) = le_u16(input)?;
     let (i, ak_ty) = le_u16(i)?;
-    let (i, _reserved_1) = complete::take(4usize)(i)?;
+    let (i, _reserved_1) = take(4usize)(i)?;
     let (i, qe_svn) = le_u16(i)?;
     let (i, pce_svn) = le_u16(i)?;
-    let (i, qe_vendor_id) = complete::take(16usize)(i)?;
-    let (i, user_data) = complete::take(20usize)(i)?;
+    let (i, qe_vendor_id) = take(16usize)(i)?;
+    let (i, user_data) = take(20usize)(i)?;
 
     Ok((
         i,
@@ -56,18 +57,18 @@ fn parse_header_ext(input: &[u8]) -> IResult<&[u8], HeaderExt> {
 }
 
 fn parse_report_body(input: &[u8]) -> IResult<&[u8], ReportBody> {
-    let (i, cpu_svn) = complete::take(16usize)(input)?;
+    let (i, cpu_svn) = take(16usize)(input)?;
     let (i, miscselect) = le_u32(i)?;
-    let (i, _reserved_1) = complete::take(28usize)(i)?;
-    let (i, attributes) = complete::take(16usize)(i)?;
-    let (i, mrenclave) = complete::take(32usize)(i)?;
-    let (i, _reserved_2) = complete::take(32usize)(i)?;
-    let (i, mrsigner) = complete::take(32usize)(i)?;
-    let (i, _reserved_3) = complete::take(96usize)(i)?;
+    let (i, _reserved_1) = take(28usize)(i)?;
+    let (i, attributes) = take(16usize)(i)?;
+    let (i, mrenclave) = take(32usize)(i)?;
+    let (i, _reserved_2) = take(32usize)(i)?;
+    let (i, mrsigner) = take(32usize)(i)?;
+    let (i, _reserved_3) = take(96usize)(i)?;
     let (i, isv_prod_id) = le_u16(i)?;
     let (i, isv_svn) = le_u16(i)?;
-    let (i, _reserved_4) = complete::take(60usize)(i)?;
-    let (i, report_data) = complete::take(64usize)(i)?;
+    let (i, _reserved_4) = take(60usize)(i)?;
+    let (i, report_data) = take(64usize)(i)?;
 
     Ok((
         i,
@@ -86,15 +87,15 @@ fn parse_report_body(input: &[u8]) -> IResult<&[u8], ReportBody> {
 }
 
 fn parse_signature(input: &[u8], _attestation_key_type: u16) -> IResult<&[u8], Signature> {
-    let (i, isv_report_signature) = complete::take(64usize)(input)?;
-    let (i, attestation_key) = complete::take(64usize)(i)?;
+    let (i, isv_report_signature) = take(64usize)(input)?;
+    let (i, attestation_key) = take(64usize)(i)?;
     let (i, qe_report) = parse_report_body(i)?;
-    let (i, qe_report_signature) = complete::take(64usize)(i)?;
-    let (i, len) = le_u16(i)?;
-    let (i, qe_authentication_data) = complete::take(usize::from(len))(i)?;
-    let (i, qe_certification_data_type) = nom::combinator::verify(le_u16, is_valid_cd_type)(i)?;
-    let (i, len) = le_u32(i)?;
-    let (i, qe_certification_data) = parse_qe_cd(&i[..len as usize], qe_certification_data_type)?;
+    let (i, qe_report_signature) = take(64usize)(i)?;
+    let (i, qe_authentication_data) = length_data(le_u16)(i)?;
+    let (i, qe_certification_data_type) = verify(le_u16, is_valid_cd_type)(i)?;
+    let (i, qe_certification_data) = length_value(le_u32, |input| {
+        parse_qe_cd(input, qe_certification_data_type)
+    })(i)?;
     Ok((
         i,
         Signature::EcdsaP256 {
@@ -117,8 +118,8 @@ fn parse_ppid_cd<'a>(
     input: &'a [u8],
     kind: impl FnMut(&'a [u8]) -> Ppid<'a>,
 ) -> IResult<&'a [u8], QeCertificationData<'a>> {
-    let (i, ppid) = nom::combinator::map(complete::take(384usize), kind)(input)?;
-    let (i, cpu_svn) = complete::take(16usize)(i)?;
+    let (i, ppid) = map(take(384usize), kind)(input)?;
+    let (i, cpu_svn) = take(16usize)(i)?;
     let (i, pce_svn) = le_u16(i)?;
     let (i, pce_id) = le_u16(i)?;
     Ok((
