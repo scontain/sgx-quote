@@ -1,4 +1,4 @@
-use nom::Finish;
+use winnow::FinishIResult;
 
 mod parsers;
 
@@ -13,9 +13,9 @@ pub struct Quote<'a> {
 /// An Intel SGX Version 3 quote, as specified in
 /// https://download.01.org/intel-sgx/dcap-1.1/linux/docs/Intel_SGX_ECDSA_QuoteGenReference_DCAP_API_Linux_1.1.pdf.
 impl<'a> Quote<'a> {
-    pub fn parse(quote_bytes: &'a [u8]) -> Result<Self, nom::error::Error<&'a [u8]>> {
+    pub fn parse(quote_bytes: &'a [u8]) -> Result<Self, winnow::error::Error<&'a [u8]>> {
         crate::parsers::parse_quote(quote_bytes)
-            .finish()
+            .finish_err()
             .map(|(_input, quote)| quote)
     }
 

@@ -1,9 +1,9 @@
-use nom::{
-    bytes::complete::take,
-    combinator::{eof, map, verify},
+use winnow::{
+    bytes::take,
+    combinator::eof,
     multi::{length_data, length_value},
-    number::complete::{le_u16, le_u32},
-    IResult,
+    number::{le_u16, le_u32},
+    IResult, Parser,
 };
 
 use crate::*;
@@ -93,7 +93,7 @@ fn parse_signature(_attestation_key_type: u16) -> impl Fn(&[u8]) -> IResult<&[u8
         let (i, qe_report) = parse_report_body(i)?;
         let (i, qe_report_signature) = take(64usize)(i)?;
         let (i, qe_authentication_data) = length_data(le_u16)(i)?;
-        let (i, qe_certification_data_type) = verify(le_u16, is_valid_cd_type)(i)?;
+        let (i, qe_certification_data_type) = le_u16.verify(is_valid_cd_type).parse_next(i)?;
         let (i, qe_certification_data) =
             length_value(le_u32, parse_qe_cd(qe_certification_data_type))(i)?;
         Ok((
@@ -120,7 +120,7 @@ where
     F: Fn(&'a [u8]) -> Ppid<'a> + Copy,
 {
     move |input| {
-        let (i, ppid) = map(take(384usize), kind)(input)?;
+        let (i, ppid) = take(384usize).map(kind).parse_next(input)?;
         let (i, cpu_svn) = take(16usize)(i)?;
         let (i, pce_svn) = le_u16(i)?;
         let (i, pce_id) = le_u16(i)?;
