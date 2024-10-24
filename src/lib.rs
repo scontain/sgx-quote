@@ -2,6 +2,8 @@ use winnow::Parser;
 
 mod parsers;
 
+pub type Error<'i> = winnow::error::ParseError<&'i [u8], winnow::error::ContextError>;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Quote<'a> {
     pub header: Header<'a>,
@@ -13,10 +15,8 @@ pub struct Quote<'a> {
 /// An Intel SGX Version 3 quote, as specified in
 /// https://download.01.org/intel-sgx/dcap-1.1/linux/docs/Intel_SGX_ECDSA_QuoteGenReference_DCAP_API_Linux_1.1.pdf.
 impl<'a> Quote<'a> {
-    pub fn parse(
-        quote_bytes: &'a [u8],
-    ) -> Result<Self, winnow::error::ParseError<&'a [u8], winnow::error::ContextError>> {
-        crate::parsers::parse_quote.parse(quote_bytes)
+    pub fn parse(quote_bytes: &'a [u8]) -> Result<Self, Error<'a>> {
+        Self::parse_impl.parse(quote_bytes)
     }
 
     /// Returns the part of the quote that's signed by the AK (i.e. *header* || *isv_report*).
