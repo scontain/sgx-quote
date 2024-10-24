@@ -1,5 +1,5 @@
 use winnow::{
-    binary::{le_u16, le_u32, length_data, length_value},
+    binary::{le_u16, le_u32, length_and_then, length_take},
     combinator::eof,
     token::take,
     PResult, Parser,
@@ -15,7 +15,7 @@ pub(crate) fn parse_quote<'i>(input: &mut &'i [u8]) -> PResult<Quote<'i>> {
 
     let HeaderExt { header, ak_ty } = parse_header_ext(input)?;
     let isv_report = parse_report_body(input)?;
-    let signature = length_value(le_u32, parse_signature(ak_ty)).parse_next(input)?;
+    let signature = length_and_then(le_u32, parse_signature(ak_ty)).parse_next(input)?;
     let _ = eof(input)?;
 
     let signed_message = &saved_input[..(HEADER_SIZE + REPORT_SIZE)];
@@ -88,15 +88,16 @@ fn parse_report_body<'i>(input: &mut &'i [u8]) -> PResult<ReportBody<'i>> {
 fn parse_signature(
     _attestation_key_type: u16,
 ) -> impl for<'i> Fn(&mut &'i [u8]) -> PResult<Signature<'i>> {
-    |input: &mut &[u8]| {
+    |input| {
         let isv_report_signature = take(64usize).parse_next(input)?;
         let attestation_key = take(64usize).parse_next(input)?;
         let qe_report = parse_report_body(input)?;
         let qe_report_signature = take(64usize).parse_next(input)?;
-        let qe_authentication_data = length_data(le_u16).parse_next(input)?;
+        let qe_authentication_data = length_take(le_u16).parse_next(input)?;
         let qe_certification_data_type = le_u16.verify(is_valid_cd_type).parse_next(input)?;
         let qe_certification_data =
-            length_value(le_u32, parse_qe_cd(qe_certification_data_type)).parse_next(input)?;
+            length_and_then(le_u32, parse_qe_cd(qe_certification_data_type)).parse_next(input)?;
+
         Ok(Signature::EcdsaP256 {
             isv_report_signature,
             attestation_key,
