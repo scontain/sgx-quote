@@ -14,7 +14,7 @@ pub const REPORT_SIZE: usize = 384;
 pub(crate) fn parse_quote(input: &[u8]) -> IResult<&[u8], Quote> {
     let (i, HeaderExt { header, ak_ty }) = parse_header_ext(input)?;
     let (i, isv_report) = parse_report_body(i)?;
-    let (i, signature) = length_value(le_u32, parse_signature(ak_ty))(i)?;
+    let (i, signature) = length_value(le_u32, parse_signature(ak_ty)).parse_next(i)?;
     let (i, _) = eof(i)?;
     Ok((
         i,
@@ -35,11 +35,11 @@ struct HeaderExt<'a> {
 fn parse_header_ext(input: &[u8]) -> IResult<&[u8], HeaderExt> {
     let (i, version) = le_u16(input)?;
     let (i, ak_ty) = le_u16(i)?;
-    let (i, _reserved_1) = take(4usize)(i)?;
+    let (i, _reserved_1) = take(4usize).parse_next(i)?;
     let (i, qe_svn) = le_u16(i)?;
     let (i, pce_svn) = le_u16(i)?;
-    let (i, qe_vendor_id) = take(16usize)(i)?;
-    let (i, user_data) = take(20usize)(i)?;
+    let (i, qe_vendor_id) = take(16usize).parse_next(i)?;
+    let (i, user_data) = take(20usize).parse_next(i)?;
 
     Ok((
         i,
@@ -57,18 +57,18 @@ fn parse_header_ext(input: &[u8]) -> IResult<&[u8], HeaderExt> {
 }
 
 fn parse_report_body(input: &[u8]) -> IResult<&[u8], ReportBody> {
-    let (i, cpu_svn) = take(16usize)(input)?;
+    let (i, cpu_svn) = take(16usize).parse_next(input)?;
     let (i, miscselect) = le_u32(i)?;
-    let (i, _reserved_1) = take(28usize)(i)?;
-    let (i, attributes) = take(16usize)(i)?;
-    let (i, mrenclave) = take(32usize)(i)?;
-    let (i, _reserved_2) = take(32usize)(i)?;
-    let (i, mrsigner) = take(32usize)(i)?;
-    let (i, _reserved_3) = take(96usize)(i)?;
+    let (i, _reserved_1) = take(28usize).parse_next(i)?;
+    let (i, attributes) = take(16usize).parse_next(i)?;
+    let (i, mrenclave) = take(32usize).parse_next(i)?;
+    let (i, _reserved_2) = take(32usize).parse_next(i)?;
+    let (i, mrsigner) = take(32usize).parse_next(i)?;
+    let (i, _reserved_3) = take(96usize).parse_next(i)?;
     let (i, isv_prod_id) = le_u16(i)?;
     let (i, isv_svn) = le_u16(i)?;
-    let (i, _reserved_4) = take(60usize)(i)?;
-    let (i, report_data) = take(64usize)(i)?;
+    let (i, _reserved_4) = take(60usize).parse_next(i)?;
+    let (i, report_data) = take(64usize).parse_next(i)?;
 
     Ok((
         i,
@@ -88,14 +88,14 @@ fn parse_report_body(input: &[u8]) -> IResult<&[u8], ReportBody> {
 
 fn parse_signature(_attestation_key_type: u16) -> impl Fn(&[u8]) -> IResult<&[u8], Signature> {
     |input: &[u8]| {
-        let (i, isv_report_signature) = take(64usize)(input)?;
-        let (i, attestation_key) = take(64usize)(i)?;
+        let (i, isv_report_signature) = take(64usize).parse_next(input)?;
+        let (i, attestation_key) = take(64usize).parse_next(i)?;
         let (i, qe_report) = parse_report_body(i)?;
-        let (i, qe_report_signature) = take(64usize)(i)?;
-        let (i, qe_authentication_data) = length_data(le_u16)(i)?;
+        let (i, qe_report_signature) = take(64usize).parse_next(i)?;
+        let (i, qe_authentication_data) = length_data(le_u16).parse_next(i)?;
         let (i, qe_certification_data_type) = le_u16.verify(is_valid_cd_type).parse_next(i)?;
         let (i, qe_certification_data) =
-            length_value(le_u32, parse_qe_cd(qe_certification_data_type))(i)?;
+            length_value(le_u32, parse_qe_cd(qe_certification_data_type)).parse_next(i)?;
         Ok((
             i,
             Signature::EcdsaP256 {
@@ -121,7 +121,7 @@ where
 {
     move |input| {
         let (i, ppid) = take(384usize).map(kind).parse_next(input)?;
-        let (i, cpu_svn) = take(16usize)(i)?;
+        let (i, cpu_svn) = take(16usize).parse_next(i)?;
         let (i, pce_svn) = le_u16(i)?;
         let (i, pce_id) = le_u16(i)?;
         Ok((
